@@ -36,7 +36,7 @@ router.post('/', async(req, res) => {
 });
 
 //route to update the user
-router.put('/profile', jwtAuthMiddleware, async(req, res) => {
+router.put('/id', jwtAuthMiddleware, async(req, res) => {
     const userId = req.user.id;
     const { username, email, currentPassword, newPassword } = req.body;
 
@@ -66,7 +66,7 @@ router.put('/profile', jwtAuthMiddleware, async(req, res) => {
         console.log('Error updating user role: ', err);
         res.status(500).json({ message: 'Server error' });
     }
-})
+});
 
 //route to delete the user
 router.delete('/:id', async(req, res) => {
@@ -83,4 +83,72 @@ router.delete('/:id', async(req, res) => {
     }
 });
 
+
+//route for signup
+
+router.post('/signup', async(req, res) => {
+    const { username, email, password } = req.body;
+    try {
+        const existingUser = await User.findOne({ username });
+        if (existingUser) {
+            return res.status(400).json({ error: 'Username is already taken' });
+        }
+        const newUser = new User({ username, email, password });
+        await newUser.save();
+        const token = generateToken({ id: newUser._id });
+        res.status(201).json({ token });
+    } catch (err) {
+        console.error('Error signing up', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
+//route for login
+
+router.post('/login', async(req, res) => {
+    const { username, password } = req.body;
+    try {
+        if (!username || !password) {
+            return res.status(400).json({ error: "username and password are required" });
+        }
+        const user = await User.findOne({ username: username });
+        if (!user || !(await user.comparePassword(password))) {
+            return res.status(401).json({ error: "Invalid username or password" });
+        }
+        //generate token
+        const payload = {
+            id: user._id,
+        }
+        const token = generateToken(payload);
+        res.json({ token });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+//router for delete
+
+router.post('/delete-account', async(req, res) => {
+    const { username, email } = req.body;
+    try {
+        const user = await User.findOne({ username });
+        if (!user) {
+            return res.status(401).json({ error: 'User not found' });
+        }
+        //check password
+        const isPassword = await user.comparePassword(password);
+        if (!isPassword) {
+            return res.status(401).json({ error: 'Invalid Credentials' });
+        }
+        // delete the user account
+        await user.remove();
+        res.json('Account deleted successfully');
+    } catch (err) {
+        console.error('Error deleting account: ', err);
+        res.status(500).json({ error: 'Server error' });
+    }
+})
 module.exports = router;
